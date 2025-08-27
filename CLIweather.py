@@ -51,14 +51,18 @@ def get_coords_manual():
         "https://nominatim.openstreetmap.org/search?"
         f"q={locsearch}&format=json&limit=1"
     )
-    data = fetch_json(url, "Geocode API", retries=1)
-    return str(data[0]["lat"]), str(data[0]["lon"])
+    data = fetch_json(url, "Geocode API", retries=1)[0]
+
+    country = data["display_name"].split(", ")[-1].upper()
+    
+    return str(data["lat"]), str(data["lon"]), str(country)
 
 
 def get_coords_auto():
     data = fetch_json("http://ipinfo.io/json", "IP geolocation", retries=1)
     lat, lon = data["loc"].split(",")
-    return lat, lon
+    country = data["country"]
+    return lat, lon, country
 
 
 def get_point_metadata_NWS(lat, lon):
@@ -107,12 +111,17 @@ def main(argv=None):
     args = parse_args(argv)
 
     if args.manual:
-        lat,lon = get_coords_manual()
+        lat, lon, country = get_coords_manual()
     else:
-        lat, lon = get_coords_auto()
+        lat, lon, country = get_coords_auto()
 
-    alerts = get_alerts_NWS(lat, lon)
-    display_alerts(alerts)
+    
+    if country == "US" or country == "UNITED STATES":
+        alerts = get_alerts_NWS(lat, lon)
+        display_alerts(alerts)
+    else:
+        print("\nCLIweather currently only supports the United States.\n")
+        return
 
     if args.alerts_only:
         return
@@ -121,7 +130,7 @@ def main(argv=None):
     forecast = get_forecast(meta["properties"]["forecast"])
 
     periods = forecast["properties"]["periods"]
-    
+
     if args.week:
         display_weekly(periods)
     else:
