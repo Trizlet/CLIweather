@@ -7,8 +7,8 @@ import requests
 def parse_args(argv):
     parser = argparse.ArgumentParser(
         prog=__file__,
-        description="A simple CLI weather tool.",
-        epilog="@Trizlet was here :P",
+        description="Weather forecasts in the terminal. Uses ipinfo.io for automatic geolocation, OpenStreetMap's Nominatim for manual geolocation, and the NWS API for weather data.",
+        epilog="@Trizlet was here",
     )
     parser.add_argument(
         "-m",
@@ -26,7 +26,7 @@ def parse_args(argv):
         "-a",
         "--alerts-only",
         action="store_true",
-        help="Only print alerts",
+        help="Only print weather alerts",
     )
     return parser.parse_args(argv)
 
@@ -45,7 +45,7 @@ def fetch_json(url, desc, retries=1):
 
 
 def get_coords_manual():
-    print("Manual locating uses https://nominatim.openstreetmap.org")
+    print("Manual locating uses https://nominatim.org/")
     locsearch = input("Enter location query (city, region/state, or postal code. country recommended for clarity): ").strip().replace(" ", "+")
     url = (
         "https://nominatim.openstreetmap.org/search?"
@@ -54,7 +54,7 @@ def get_coords_manual():
     data = fetch_json(url, "Geocode API", retries=1)[0]
 
     country = data["display_name"].split(", ")[-1].upper()
-    
+
     return str(data["lat"]), str(data["lon"]), str(country)
 
 
