@@ -1,10 +1,10 @@
 import argparse
 import sys
-
+import time
 import requests
 
 
-def parse_args():
+def parse_args(argv):
     parser = argparse.ArgumentParser(
         prog=__file__,
         description="A simple CLI weather tool.",
@@ -22,31 +22,37 @@ def parse_args():
         action="store_true",
         help="Print weekly forecast instead of current day",
     )
-    return parser.parse_args()
-
+    parser.add_argument(
+        "-a",
+        "--alerts-only",
+        action="store_true",
+        help="Only print alerts",
+    )
+    return parser.parse_args(argv)
 
 def fetch_json(url, desc, retries=1):
+    headers = {
+    "User-Agent": "CLIweather (@Trizlet)",
+    "Accept": "application/json"
+    }
     for _ in range(retries + 1):
-        r = requests.get(url)
+        r = requests.get(url,headers=headers)
         if r.status_code == 200:
             return r.json()
+        time.sleep(1)
     print(f"{desc} error! Status {r.status_code}.")
     sys.exit(1)
 
 
 def get_coords_manual():
-    print("Manual locating uses https://geocoding.geo.census.gov/geocoder/")
-    street = input("Enter street (# and name): ").strip().replace(" ", "+")
-    city = input("Enter city: ").strip().replace(" ", "+")
-    state = input("Enter state (abbrev): ").strip().upper()
+    print("Manual locating uses https://nominatim.openstreetmap.org")
+    locsearch = input("Enter location query (city, region/state, or postal code. country recommended for clarity): ").strip().replace(" ", "+")
     url = (
-        "https://geocoding.geo.census.gov/geocoder/locations/address"
-        f"?street={street}&city={city}&state={state}"
-        "&benchmark=2020&format=json"
+        "https://nominatim.openstreetmap.org/search?"
+        f"q={locsearch}&format=json&limit=1"
     )
     data = fetch_json(url, "Geocode API", retries=1)
-    coords = data["result"]["addressMatches"][0]["coordinates"]
-    return str(coords["y"]), str(coords["x"])
+    return str(data[0]["lat"]), str(data[0]["lon"])
 
 
 def get_coords_auto():
@@ -55,7 +61,7 @@ def get_coords_auto():
     return lat, lon
 
 
-def get_point_metadata(lat, lon):
+def get_point_metadata_NWS(lat, lon):
     url = f"https://api.weather.gov/points/{lat},{lon}"
     return fetch_json(url, "NWS location data")
 
@@ -64,7 +70,7 @@ def get_forecast(forecast_url):
     return fetch_json(forecast_url, "NWS forecast")
 
 
-def get_alerts(lat, lon):
+def get_alerts_NWS(lat, lon):
     url = f"https://api.weather.gov/alerts/active?point={lat},{lon}"
     return fetch_json(url, "NWS alerts")
 
@@ -97,19 +103,25 @@ def display_weekly(periods):
     print("============\n")
 
 
-def main():
-    args = parse_args()
+def main(argv=None):
+    args = parse_args(argv)
+
     if args.manual:
-        lat, lon = get_coords_manual()
+        lat,lon = get_coords_manual()
     else:
         lat, lon = get_coords_auto()
 
-    meta = get_point_metadata(lat, lon)
-    forecast = get_forecast(meta["properties"]["forecast"])
-    alerts = get_alerts(lat, lon)
-
+    alerts = get_alerts_NWS(lat, lon)
     display_alerts(alerts)
+
+    if args.alerts_only:
+        return
+
+    meta = get_point_metadata_NWS(lat, lon)
+    forecast = get_forecast(meta["properties"]["forecast"])
+
     periods = forecast["properties"]["periods"]
+    
     if args.week:
         display_weekly(periods)
     else:
